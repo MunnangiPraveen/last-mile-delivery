@@ -1,0 +1,239 @@
+// Last-Mile Delivery Tracker - Database Schema
+// Using SQLite for local dev, switchable to PostgreSQL for production
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ─── USER & AUTH ─────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("CUSTOMER") // CUSTOMER, AGENT, ADMIN
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  agentProfile    AgentProfile?
+  orders          Order[]          @relation("CustomerOrders")
+  assignments     AgentAssignment[] @relation("AssignedAgent")
+  assignedBy      AgentAssignment[] @relation("AssignedBy")
+  trackingActions TrackingHistory[] @relation("TrackingActor")
+  notifications   Notification[]
+  reschedules     Reschedule[]     @relation("RescheduleRequester")
+
+  @@index([email])
+  @@index([role])
+}
+
+// ─── AGENT PROFILE ───────────────────────────────────────
+
+model AgentProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  availability    String   @default("AVAILABLE") // AVAILABLE, BUSY, OFFLINE
+  currentWorkload Int      @default(0)
+  zoneId          String?
+  phone           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  zone Zone? @relation(fields: [zoneId], references: [id])
+
+  @@index([availability])
+  @@index([zoneId])
+}
+
+// ─── ZONES & AREAS ───────────────────────────────────────
+
+model Zone {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  areas         Area[]
+  agentProfiles AgentProfile[]
+  pickupOrders  Order[]  @relation("PickupZone")
+  dropOrders    Order[]  @relation("DropZone")
+}
+
+model Area {
+  id        String   @id @default(cuid())
+  name      String
+  pincode   String
+  zoneId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  zone Zone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  @@unique([pincode])
+  @@index([zoneId])
+}
+
+// ─── RATE CARDS & COD ────────────────────────────────────
+
+model RateCard {
+  id         String   @id @default(cuid())
+  orderType  String   // B2B, B2C
+  zoneType   String   // INTRA_ZONE, INTER_ZONE
+  ratePerKg  Float
+  minCharge  Float    @default(0)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([orderType, zoneType])
+  @@index([isActive])
+}
+
+model CodCharge {
+  id        String   @id @default(cuid())
+  orderType String   @unique // B2B, B2C
+  surcharge Float
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── ORDERS ──────────────────────────────────────────────
+
+model Order {
+  id              String   @id @default(cuid())
+  trackingNumber  String   @unique
+  customerId      String
+  status          String   @default("CREATED") // CREATED, PICKED_UP, IN_TRANSIT, OUT_FOR_DELIVERY, DELIVERED, FAILED
+
+  // Addresses
+  pickupAddress   String
+  pickupPincode   String
+  dropAddress     String
+  dropPincode     String
+
+  // Package
+  length          Float
+  breadth         Float
+  height          Float
+  actualWeight    Float
+
+  // Calculated
+  volumetricWeight Float
+  billableWeight   Float
+
+  // Order config
+  orderType       String   // B2B, B2C
+  paymentType     String   // PREPAID, COD
+
+  // Zone info
+  pickupZoneId    String?
+  dropZoneId      String?
+  rateType        String?  // B2B_INTRA_ZONE, B2B_INTER_ZONE, B2C_INTRA_ZONE, B2C_INTER_ZONE
+
+  // Charges
+  baseCharge      Float    @default(0)
+  codSurcharge    Float    @default(0)
+  totalCharge     Float    @default(0)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  customer        User     @relation("CustomerOrders", fields: [customerId], references: [id])
+  pickupZone      Zone?    @relation("PickupZone", fields: [pickupZoneId], references: [id])
+  dropZone        Zone?    @relation("DropZone", fields: [dropZoneId], references: [id])
+  assignments     AgentAssignment[]
+  trackingHistory TrackingHistory[]
+  notifications   Notification[]   @relation("OrderNotifications")
+  reschedules     Reschedule[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([trackingNumber])
+  @@index([createdAt])
+}
+
+// ─── AGENT ASSIGNMENT ────────────────────────────────────
+
+model AgentAssignment {
+  id         String   @id @default(cuid())
+  orderId    String
+  agentId    String
+  assignedById String
+  isActive   Boolean  @default(true)
+  assignedAt DateTime @default(now())
+
+  order      Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  agent      User  @relation("AssignedAgent", fields: [agentId], references: [id])
+  assignedBy User  @relation("AssignedBy", fields: [assignedById], references: [id])
+
+  @@index([orderId])
+  @@index([agentId])
+  @@index([isActive])
+}
+
+// ─── TRACKING HISTORY (IMMUTABLE) ────────────────────────
+
+model TrackingHistory {
+  id             String   @id @default(cuid())
+  orderId        String
+  previousStatus String?
+  newStatus      String
+  actorId        String
+  note           String?
+  createdAt      DateTime @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  actor User  @relation("TrackingActor", fields: [actorId], references: [id])
+
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+// ─── NOTIFICATIONS ───────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String   // ORDER_CREATED, AGENT_ASSIGNED, PICKED_UP, IN_TRANSIT, OUT_FOR_DELIVERY, DELIVERED, FAILED, RESCHEDULED
+  isRead    Boolean  @default(false)
+  orderId   String?
+  createdAt DateTime @default(now())
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order? @relation("OrderNotifications", fields: [orderId], references: [id])
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+// ─── RESCHEDULE ──────────────────────────────────────────
+
+model Reschedule {
+  id                  String   @id @default(cuid())
+  orderId             String
+  previousAttemptDate DateTime
+  newDate             DateTime
+  requestedById       String
+  reason              String?
+  createdAt           DateTime @default(now())
+
+  order       Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  requestedBy User  @relation("RescheduleRequester", fields: [requestedById], references: [id])
+
+  @@index([orderId])
+}

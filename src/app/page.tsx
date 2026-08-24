@@ -1,69 +1,46 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+import Link from 'next/link';
 
 export default function Home() {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>
-            To get started, edit the{" "}
-            <code className={styles.code}>page.tsx</code> file.
-          </h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+    <div className="landing-page">
+      <header className="landing-header">
+        <div className="landing-logo">📦 LMD Tracker</div>
+        <Link href="/register" className="btn btn-secondary btn-sm">
+          Register
+        </Link>
+      </header>
+
+      <main className="landing-main">
+        <h1>Last-Mile Delivery<br />Tracker</h1>
+        <p>
+          Professional delivery management platform. Track orders, manage agents,
+          and optimize your last-mile delivery operations.
+        </p>
+
+        <div className="portal-grid">
+          <Link href="/login/customer" className="portal-card">
+            <div className="portal-icon">👤</div>
+            <h3>Customer Portal</h3>
+            <p>Create orders, track deliveries, and manage your shipments.</p>
+          </Link>
+
+          <Link href="/login/agent" className="portal-card">
+            <div className="portal-icon">🚚</div>
+            <h3>Agent Portal</h3>
+            <p>View assigned deliveries, update status, and manage availability.</p>
+          </Link>
+
+          <Link href="/login/admin" className="portal-card">
+            <div className="portal-icon">⚙️</div>
+            <h3>Admin Portal</h3>
+            <p>Manage zones, rates, agents, and monitor all operations.</p>
+          </Link>
         </div>
       </main>
+
+      <footer className="landing-footer">
+        &copy; {new Date().getFullYear()} Last-Mile Delivery Tracker. Built for logistics excellence.
+      </footer>
     </div>
   );
 }
